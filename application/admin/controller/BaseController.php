@@ -7,6 +7,6 @@ use think\Controller;
 class BaseController extends Controller
 {
 	public function _initialize() {
-		
+		# 我爱王堃
 	}
 }
