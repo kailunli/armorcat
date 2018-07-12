@@ -9,6 +9,11 @@ class WechatPublic extends Base
 	{
 		parent::__construct();
 	}
+	
+	public function test() {
+
+	}
+	
 	// 入口
 	public function index()
 	{	
@@ -123,7 +128,7 @@ class WechatPublic extends Base
 	{
 		$wechatXml = $this->wechatXml;
 		$content   = $wechatXml->Content;
-	
+
 		switch ( trim($content) ) {
 			case '熊猫':
 				$response = '<a href="http://www.armorcat.com/">www.armorcat.com</a>';
