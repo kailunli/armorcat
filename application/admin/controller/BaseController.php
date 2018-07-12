@@ -3,13 +3,10 @@ namespace app\admin\controller;
 
 use think\Controller;
 
-/**
- @class  项目基类
- @author lkl
-*/
+// 基类控制器
 class BaseController extends Controller
 {
 	public function _initialize() {
-		
+		# 我爱王堃
 	}
 }
