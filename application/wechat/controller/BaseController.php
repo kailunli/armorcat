@@ -72,39 +72,40 @@ class BaseController extends Controller
 		$wechatPostData   = intval(phpversion()) < 7 ? $GLOBALS['HTTP_RAW_POST_DATA'] : file_get_contents("php://input");	
 	
 		if (self::SAFE_MODEL == true) {
-			$this->decryptSafeMsg($wechatPostData);
+			$wechatXml = simplexml_load_string($wechatPostData);
+			$wechatPostData = $this->decrypt($wechatXml->Encrypt);
 		} 
 		
-		$wechatXml = simplexml_load_string($wechatPostData);
-		$this->wechatXml  = $wechatXml;
+		$this->wechatXml = simplexml_load_string($wechatPostData);
 	}
 	
-	// 安全模式下解密消息
-	private function decryptSafeMsg(&$wechatPostData)
+	// 安全模式下解密微信服务器推送的消息
+	protected function decrypt($encrypt)
 	{
 		try {
-			$wechatXml = simplexml_load_string($wechatPostData); 
 			$format = "<xml><ToUserName><![CDATA[toUser]]></ToUserName><Encrypt><![CDATA[%s]]></Encrypt></xml>";
-			$from_xml = sprintf($format, $wechatXml->Encrypt);
+			$from_xml = sprintf($format, $encrypt);
 			
 			$pc = new \wx_public_crypt\WXBizMsgCrypt(self::TOKEN, self::ENCODING_AES_KEY, self::APP_ID);  
-			$errCode = $pc->decryptMsg($this->msgSignature, $this->timestamp, $this->nonce, $from_xml, $wechatPostData); 
+			$errCode = $pc->decryptMsg($this->msgSignature, $this->timestamp, $this->nonce, $from_xml, $decrypt); 
 			
-			if ($errCode != 0) {
-				return "errCode:" . $errCode;
-			} 
+			if ($errCode == 0) {
+				return $decrypt;
+			} else {
+				print($errCode . "\n");
+			}
 		} catch (\Exception $e) {
 			print ($e->getMessage());
 		}
 	}
 	
 	// 加密消息
-	protected function encrypt($msg) 
+	protected function encrypt($decrypt) 
 	{
 		try {
 			$pc = new \wx_public_crypt\WXBizMsgCrypt(self::TOKEN, self::ENCODING_AES_KEY, self::APP_ID);  				
 			$encrypt = '';
-			$errCode = $pc->encryptMsg($msg, $this->timestamp, $this->nonce, $encrypt);
+			$errCode = $pc->encryptMsg($decrypt, $this->timestamp, $this->nonce, $encrypt);
 			if ($errCode == 0) {
 				// 加密消息
 				return $encrypt;
@@ -113,20 +114,6 @@ class BaseController extends Controller
 			}
 		} catch(\Exception $e){
 			print ($e->getMessage());
-		}
-	}
-	
-	// 解密消息
-	protected function decrypt()
-	{	
-	    $pc = new \wx_public_crypt\WXBizMsgCrypt(self::TOKEN, self::ENCODING_AES_KEY, self::APP_ID);
-		$decrypt = '';
-		$errCode = $pc->decryptMsg($this->signature, $this->timestamp, $this->nonce, $this->wechatXml, $decrypt);		
-		
-		if ($errCode == 0) {
-			return $decrypt;
-		} else {
-			print($errCode . "\n");
 		}
 	}
 	
