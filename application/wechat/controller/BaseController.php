@@ -2,7 +2,6 @@
 namespace app\wechat\controller;
 
 use think\Controller;
-
 /**
 简单解释下开发者ID和服务器配置各参数的作用：
 AppID是应用ID，也就是微信开发者编号的意思，在微信中主要用于创建微信菜单等。
@@ -29,7 +28,7 @@ class BaseController extends Controller
 	const ENCODING_AES_KEY = 'm5PcJl58cQx7Rzp8euZ57nNpRu4bRoDiSb1yHiDJnBc';
 	
 	// 是否是安全模式
-	const SAFE_MODEL = true;
+	const SAFE_MODEL = true; // 兼容模式下可设置；安全模式下必须为true;明文模式下必须为false
 	
 	// 处理微信HTTP_RAW_POST_DATA后的xml对象
 	protected $wechatXml;
@@ -41,13 +40,15 @@ class BaseController extends Controller
 	protected $timestamp;
 	protected $nonce;
 	protected $echostr = null; // 第一次验证,有GET参数echostr
+	protected $msgSignature = null; // 安全模式下，微信服务器推送给第三方的用于消息解密的签名
 	
 	public function __construct() 
 	{
-		$this->signature = $_GET['signature'];
+		$this->signature = $_GET["signature"];
 		$this->timestamp = $_GET["timestamp"];
 		$this->nonce     = $_GET["nonce"];
 		$this->echostr   = isset($_GET['echostr']) ? $_GET['echostr'] : null; // 第一次验证,有GET参数echostr
+		$this->msgSignature = isset($_GET['msg_signature']) ? $_GET['msg_signature'] : null; // 微信服务器推送给第三方的用于消息解密的签名
 	}
 	
 	// 验证TOKEN
@@ -68,21 +69,50 @@ class BaseController extends Controller
 	// 将微信数据解析成xml对象
 	protected function setXmlObject() 
 	{
-		$wechatPostData   = intval(phpversion()) < 7 ? $GLOBALS['HTTP_RAW_POST_DATA'] : file_get_contents("php://input");			
-		$wechatXml        = simplexml_load_string($wechatPostData);
+		$wechatPostData   = intval(phpversion()) < 7 ? $GLOBALS['HTTP_RAW_POST_DATA'] : file_get_contents("php://input");	
+	
+		if (self::SAFE_MODEL == true) {
+			$this->decryptSafeMsg($wechatPostData);
+		} 
+		
+		$wechatXml = simplexml_load_string($wechatPostData);
 		$this->wechatXml  = $wechatXml;
+	}
+	
+	// 安全模式下解密消息
+	private function decryptSafeMsg(&$wechatPostData)
+	{
+		try {
+			$wechatXml = simplexml_load_string($wechatPostData); 
+			$format = "<xml><ToUserName><![CDATA[toUser]]></ToUserName><Encrypt><![CDATA[%s]]></Encrypt></xml>";
+			$from_xml = sprintf($format, $wechatXml->Encrypt);
+			
+			$pc = new \wx_public_crypt\WXBizMsgCrypt(self::TOKEN, self::ENCODING_AES_KEY, self::APP_ID);  
+			$errCode = $pc->decryptMsg($this->msgSignature, $this->timestamp, $this->nonce, $from_xml, $wechatPostData); 
+			
+			if ($errCode != 0) {
+				return "errCode:" . $errCode;
+			} 
+		} catch (\Exception $e) {
+			print ($e->getMessage());
+		}
 	}
 	
 	// 加密消息
 	protected function encrypt($msg) 
 	{
-		$pc = new \wx_public_crypt\WXBizMsgCrypt(self::TOKEN, self::ENCODING_AES_KEY, self::APP_ID);
-		$encrypt = '';
-		$errCode = $pc->encryptMsg($msg, time(), $this->nonce, $encrypt);
-		if ($errCode == 0) {
-			return $encrypt;
-		} else {
-			print($errCode . "\n");
+		try {
+			$pc = new \wx_public_crypt\WXBizMsgCrypt(self::TOKEN, self::ENCODING_AES_KEY, self::APP_ID);  				
+			$encrypt = '';
+			$errCode = $pc->encryptMsg($msg, $this->timestamp, $this->nonce, $encrypt);
+			if ($errCode == 0) {
+				// 加密消息
+				return $encrypt;
+			} else {
+				print($errCode . "\n");
+			}
+		} catch(\Exception $e){
+			print ($e->getMessage());
 		}
 	}
 	
@@ -91,7 +121,8 @@ class BaseController extends Controller
 	{	
 	    $pc = new \wx_public_crypt\WXBizMsgCrypt(self::TOKEN, self::ENCODING_AES_KEY, self::APP_ID);
 		$decrypt = '';
-		$errCode = $pc->decryptMsg($this->signature, $this->timestamp, $this->nonce, $this->wechatXml, $decrypt);
+		$errCode = $pc->decryptMsg($this->signature, $this->timestamp, $this->nonce, $this->wechatXml, $decrypt);		
+		
 		if ($errCode == 0) {
 			return $decrypt;
 		} else {
@@ -152,7 +183,7 @@ class BaseController extends Controller
 				return $msg;
 			}
 		}catch(\Exception $e){
-			file_put_contents('test.txt', $e->getMessage());
+			print $e->getMessage();
 		}
 	}
 	// 1.回复文本消息

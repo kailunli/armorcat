@@ -1,1 +1,7 @@
-event
+<xml><ToUserName><![CDATA[gh_de4711a172f5]]></ToUserName>
+<FromUserName><![CDATA[oqqs00Z5pYEkSi_SmEGh4-bqBZYo]]></FromUserName>
+<CreateTime>1531370456</CreateTime>
+<MsgType><![CDATA[text]]></MsgType>
+<Content><![CDATA[好汉歌]]></Content>
+<MsgId>6577186026998800049</MsgId>
+</xml>
